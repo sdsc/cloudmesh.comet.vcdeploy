@@ -1,0 +1,43 @@
+#!/bin/sh
+# Install ssh key
+#mkdir -p {{ ansible_user_dir }}
+#cp -rT /etc/skel {{ ansible_user_dir }}
+#chown -R {{ ansible_user_id }}:{{ ansible_user_id }} {{ ansible_user_dir }}
+mkdir --mode=700 {{ ansible_user_dir }}/.ssh
+cat >> {{ ansible_user_dir }}/.ssh/authorized_keys << "PUBLIC_KEY"
+{{PUBLIC_KEY.stdout}}
+PUBLIC_KEY
+chmod 600 {{ ansible_user_dir }}/.ssh/authorized_keys
+chown -R {{ ansible_user_id }}:{{ ansible_user_id }} {{ ansible_user_dir }}/.ssh
+
+#sed -i '/home/d' /etc/fstab
+#echo '10.0.0.254:/home /export/home nfs defaults 0 0' >> /etc/fstab
+#sed -i 's/ens3/eth0/' /etc/network/interfaces
+echo 'mlx4_ib
+ib_umad
+ib_ipoib
+ib_cm
+ib_ucm
+rdma_ucm' >> /etc/modules
+
+#sed -i '/^ubuntu/d' /etc/group
+#echo 'ubuntu:x:1001:' >> /etc/group
+
+# change from local mirro to ubuntu archive so update and
+# install of more packages could be done
+sed -i "s/10.0.0.254/us.archive.ubuntu.com/g" /etc/apt/sources.list
+
+echo 'btl_openib_warn_no_device_params_found = 0' >>  /etc/openmpi/openmpi-mca-params.conf
+
+echo  '
+*   -   memlock     -1
+*   -   stack       -1
+*   -   nofile      8192' >> /etc/security/limits.conf
+
+wget -O /etc/hosts http://10.0.0.254/hosts
+wget -O /root/firstboot.sh http://10.0.0.254/firstboot.sh
+wget -O /etc/rc.local http://10.0.0.254/rc.local
+chmod +x /etc/rc.local /root/firstboot.sh
+
+#apt update
+#apt install ntp ssh wget nfs-common infiniband-diags openmpi-bin libopenmpi-dev python-mpi4py libmthca-dev librdmacm-dev libibumad-dev libibverbs-dev libibmad-dev libibcm-dev libmlx4-dev make g++ libtool perftest autoconf automake

@@ -1,0 +1,33 @@
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# Internal/Private interface
+auto ens3
+iface ens3 inet static
+      address 10.0.0.254
+      netmask 255.255.255.0
+      network 10.0.0.0
+      broadcast 10.0.0.255
+
+# The primary network interface
+auto ens4
+iface ens4 inet static
+    address {{ ansible_ens4.ipv4.address }}
+    netmask {{ ansible_ens4.ipv4.netmask }}
+    network {{ ansible_ens4.ipv4.network }}
+    broadcast {{ ansible_ens4.ipv4.broadcast }}
+    gateway {{ ansible_default_ipv4.gateway }}
+    dns-nameservers {{ ansible_dns.nameservers[0] }}
+    dns-search {{ ansible_dns.search[0] }}
+
+# IPoIB
+auto ib0
+iface ib0 inet static
+    address 10.1.0.254
+    netmask 255.255.255.0
+    network 10.1.0.0
+    broadcast 10.1.0.255

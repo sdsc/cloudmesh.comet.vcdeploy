@@ -1,0 +1,306 @@
+---
+- hosts: all
+  vars_prompt:
+  - name: "ansible_sudo_pass"
+    prompt: "Enter the password for the user on the VC front end"
+    private: yes
+  gather_facts: false
+
+  # prepare python installation as otherwise ansible cannot proceed
+  pre_tasks:
+  - name: Install python2 for Ansible
+    raw: bash -c "test -e /usr/bin/python || (apt -qqy update && apt install -qqy python-minimal)"
+    become: true
+  - name: Gathering Facts
+    setup:
+
+  tasks:
+  - name: Copy configuration script and data files to VC front end node
+    copy:
+      src: "{{item.src}}"
+      dest: "{{item.dest}}"
+    with_items:
+      - {src: "cmutil.py",
+         dest: "{{ansible_user_dir}}/cmutil.py"}
+      - {src: "vcnodes_{{ansible_hostname}}.txt",
+         dest: "{{ansible_user_dir}}/vcnodes_{{ansible_hostname}}.txt"}
+      - {src: "vcnet_{{ansible_hostname}}.txt",
+         dest: "{{ansible_user_dir}}/vcnet_{{ansible_hostname}}.txt"}
+
+  - name: Changing cmutil.py as executable
+    file:
+      dest: "{{ansible_user_dir}}/cmutil.py"
+      mode: "a+x"
+  
+  - name: Update repository cache if necessary
+    apt:
+      update_cache: yes
+      cache_valid_time: "{{60*60*24}}" # if older than 1 day
+    become: true
+
+  - name: Install Packages
+    apt:
+      pkg: "{{ item }}"
+      state: latest
+    with_items:
+      - curl
+      - git
+      - apache2
+      - tftpd-hpa
+      - isc-dhcp-server
+      - inetutils-inetd
+      - nfs-kernel-server
+      - iptables-persistent
+    become: true
+
+  - name: Check if files had been copied over - dir exists?
+    stat:
+      path: /var/www/html/ubuntu
+    register: ubuntu_dir
+    become: true
+
+  - name: Check if files had been copied over - dir size?
+    find:
+      paths: /var/www/html/ubuntu
+      file_type: directory
+      patterns: "*"
+    register: ubuntu_dir_size
+    become: true
+
+  - name: Check if mounting directory exists
+    stat:
+      path: /media/cdrom/
+    register: cdrom_mount
+    become: true
+
+  - name: cdrom mounting directory empty?
+    find:
+      paths: /media/cdrom
+      file_type: directory
+      patterns: "*"
+    register: cdrom_dir_size
+    become: true
+
+  - name: Mount Ubuntu Installation CD
+    mount:
+      name: /media/cdrom
+      src: /dev/cdrom
+      fstype: iso9660
+      opts: ro
+      state: mounted
+    when: ((ubuntu_dir.stat.isdir is not defined) or (ubuntu_dir_size.matched|int == 0)) and ((cdrom_mount.stat.isdir is not defined) or (cdrom_dir_size.matched|int == 0))
+    become: true
+
+  - name: make sure /var/www/html/ubuntu exists if not already created
+    file:
+      path: /var/www/html/ubuntu
+      state: directory
+    when: ubuntu_dir.stat.isdir is not defined
+    become: true
+
+  - name: Copy Installation CD content over for pxebooting and compute nodes installation
+    shell: "cp -r /media/cdrom/* /var/www/html/ubuntu"
+    when: (ubuntu_dir.stat.isdir is not defined) or (ubuntu_dir_size.matched|int == 0)
+    become: true
+
+  - name: tftpboot directory empty?
+    find:
+      paths: /var/lib/tftpboot
+      file_type: directory
+      patterns: "*"
+    register: tftpboot_dir_size
+    become: true
+
+  # empty directory could use some space. Use 1MB as a test to
+  # check if the content has been copied over
+  - name: Copy netboot files to tftp directory
+    shell: "cp -r /var/www/html/ubuntu/install/netboot/* /var/lib/tftpboot/"
+    when: tftpboot_dir_size.matched|int == 0
+    become: true
+
+  - name: Unmount Ubuntu Installation DVD
+    mount:
+      name: /media/cdrom
+      state: absent
+    become: true
+
+  - name: config dhcp
+    lineinfile:
+      dest: /etc/default/isc-dhcp-server
+      line: 'INTERFACES="ens3"'  
+    become: true
+
+  - name: config tftp - set as daemon
+    lineinfile:
+      dest: /etc/default/tftpd-hpa
+      line: 'RUN_DAEMON="yes"'
+    become: true
+
+  - name: config tftp - set start options
+    lineinfile:
+      dest: /etc/default/tftpd-hpa
+      line: 'OPTIONS="-l -s /var/lib/tftpboot"'
+    become: true
+
+  - name: home export
+    lineinfile:
+      dest: /etc/exports
+      line: '/home 10.0.0.0/24(rw,sync)'
+    become: true
+
+  - name: config inetd.conf
+    lineinfile:
+      dest: /etc/inetd.conf
+      line: 'tftp    dgram   udp    wait    root    /usr/sbin/in.tftpd /usr/sbin/in.tftpd -s /var/lib/tftpboot'
+    become: true
+
+  - name: config inetd.conf
+    lineinfile:
+      dest: /etc/sysctl.conf
+      line: 'net.ipv4.ip_forward=1'
+    become: true
+
+  - name: enable the changes on sysctl.conf
+    shell: sysctl -p
+    become: true
+
+  - name: Copy config files
+    copy:
+      src: "{{item.src}}"
+      dest: "{{item.dest}}"
+    with_items:
+      - {src: "dhcpd.conf", dest: "/etc/dhcp/dhcpd.conf"}
+      - {src: "compute_default.temp", dest: "/var/lib/tftpboot/pxelinux.cfg/default.temp"}
+      - {src: "compute_firstboot.sh", dest: "/var/www/html/firstboot.sh"}
+      - {src: "compute_rc.local", dest: "/var/www/html/rc.local"}
+    become: true
+
+  - name: hosts file on frontend
+    template:
+      src: fe_etc_hosts.j2
+      dest: /etc/hosts
+    ignore_errors: yes
+    become: true
+
+  - name: hosts file for compute nodes
+    template:
+      src: compute_hosts.j2
+      dest: /var/www/html/hosts
+    ignore_errors: yes
+    become: true
+
+  - name: kickstart file generation
+    template:
+      src: compute_ks.j2
+      dest: /var/www/html/ks.cfg
+    ignore_errors: yes
+    become: true
+
+  #sudo iptables -t nat -A POSTROUTING -o ens4 -j MASQUERADE
+  #sudo iptables -A FORWARD -i ens4 -o ens3 -m state --state RELATED,ESTABLISHED -j ACCEPT
+  #sudo iptables -A FORWARD -i ens3 -o ens4 -j ACCEPT
+  - name: Configure iptables to enable routing for compute nodes - step 1
+    iptables:
+      table: nat
+      chain: POSTROUTING
+      out_interface: ens4
+      jump: MASQUERADE
+    become: true
+
+  - name: Configure iptables to enable routing for compute nodes - step 2
+    iptables:
+      chain: FORWARD
+      in_interface: ens4
+      out_interface: ens3
+      ctstate: ESTABLISHED,RELATED
+      jump: ACCEPT
+    become: true
+
+  - name: Configure iptables to enable routing for compute nodes - step 3
+    iptables:
+      chain: FORWARD
+      in_interface: ens3
+      out_interface: ens4
+      jump: ACCEPT
+    become: true
+
+  - name: persistent the iptables rules
+    shell: netfilter-persistent save
+    become: true
+
+  - name: Enable IB modules
+    modprobe:
+      name: "{{ item }}"
+      state: present
+    with_items:
+      - mlx4_ib
+      - ib_umad
+      - ib_ipoib
+    become: true
+
+  - name: Automatically load IB modules in the future
+    lineinfile:
+      dest: /etc/modules
+      line: "{{ item }}"
+      state: present
+    with_items:
+      - mlx4_ib
+      - ib_umad
+      - ib_ipoib
+    become: true
+
+  - name: Add IPoIB interface to /etc/network/interfaces
+    when: "'ipv4' in hostvars['{{inventory_hostname}}']['ansible_ens4']"
+    template:
+      src: fe_etc_network_interfaces.j2
+      dest: /etc/network/interfaces
+      owner: root
+      group: root
+      mode: 0644
+    ignore_errors: yes
+    become: true
+
+  - name: Bring up the ib0 interface
+    shell: ifup ib0
+    ignore_errors: yes
+    become: true
+
+  - name: Restart Network - ens3
+    shell: "ifdown ens3 && ifup ens3"
+    become: true
+
+  - name: Restart Network - ens4
+    shell: "ifdown ens4 && ifup ens4"
+    become: true
+
+  - name: Restarting other system services
+    service:
+      name: "{{item}}"
+      state: restarted
+    with_items:
+      - isc-dhcp-server
+      - tftpd-hpa
+      - inetutils-inetd
+      - ssh
+      - nfs-kernel-server
+    become: true
+
+  - name: Set pxeboot files
+    shell: "{{ ansible_user_dir }}/cmutil.py pxefile {{ansible_hostname}}"
+    become: true
+
+  - name: Generate SSH keys on frontend node
+    shell: ssh-keygen -b 2048 -t rsa -f "{{ ansible_user_dir }}"/.ssh/id_rsa -q -N ""
+    args:
+      creates: "{{ ansible_user_dir }}/.ssh/id_rsa"
+
+  - name: Read id_rsa.pub key content
+    shell: /bin/cat "{{ ansible_user_dir}}"/.ssh/id_rsa.pub
+    register: PUBLIC_KEY
+
+  - name: postscript installation
+    template:
+      src: compute_postscript.j2
+      dest: /var/www/html/postscript.sh
+    ignore_errors: yes
+    become: true

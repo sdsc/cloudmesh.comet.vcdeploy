@@ -148,6 +148,20 @@
       line: '/home 10.0.0.0/24(rw,sync)'
     become: true
 
+  - name: auto.master for computes
+    template:
+      src: fe_etc_auto_master.j2
+      dest: /var/www/html/auto.master
+    ignore_errors: yes
+    become: true
+
+  - name: auto.home for computes
+    template:
+      src: fe_etc_auto_home.j2
+      dest: /var/www/html/auto.home
+    ignore_errors: yes
+    become: true
+
   - name: config inetd.conf
     lineinfile:
       dest: /etc/inetd.conf

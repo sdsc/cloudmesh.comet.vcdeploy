@@ -311,8 +311,16 @@
     args:
       creates: "{{ ansible_user_dir }}/.ssh/id_rsa"
 
+  - name: Set trust on SSH key on frontend
+    shell: /bin/cat "{{ ansible_user_dir }}"/.ssh/id_rsa.pub >> "{{ ansible_user_dir }}/.ssh/authorized_keys"
+
+  - name: Set perms on authorized_keys
+    file:
+      dest: "{{ ansible_user_dir }}/.ssh/authorized_keys"
+      mode: "a+x"
+
   - name: Read id_rsa.pub key content
-    shell: /bin/cat "{{ ansible_user_dir}}"/.ssh/id_rsa.pub
+    shell: /bin/cat "{{ ansible_user_dir }}"/.ssh/id_rsa.pub
     register: PUBLIC_KEY
 
   - name: postscript installation

@@ -31,7 +31,7 @@
     file:
       dest: "{{ansible_user_dir}}/cmutil.py"
       mode: "a+x"
-  
+
   - name: Update repository cache if necessary
     apt:
       update_cache: yes
@@ -130,7 +130,7 @@
   - name: config dhcp
     lineinfile:
       dest: /etc/default/isc-dhcp-server
-      line: 'INTERFACES="ens3"'  
+      line: 'INTERFACES="ens3"'
     become: true
 
   - name: config tftp - set as daemon

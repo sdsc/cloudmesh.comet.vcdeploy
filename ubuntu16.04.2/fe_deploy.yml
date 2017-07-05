@@ -45,6 +45,9 @@
     with_items:
       - curl
       - git
+      - htop
+      - vim
+      - bc
       - apache2
       - tftpd-hpa
       - isc-dhcp-server

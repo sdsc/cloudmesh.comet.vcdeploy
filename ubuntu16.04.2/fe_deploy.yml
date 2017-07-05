@@ -31,7 +31,7 @@
     file:
       dest: "{{ansible_user_dir}}/cmutil.py"
       mode: "a+x"
-  
+
   - name: Update repository cache if necessary
     apt:
       update_cache: yes
@@ -45,6 +45,9 @@
     with_items:
       - curl
       - git
+      - htop
+      - vim
+      - bc
       - apache2
       - tftpd-hpa
       - isc-dhcp-server
@@ -127,7 +130,7 @@
   - name: config dhcp
     lineinfile:
       dest: /etc/default/isc-dhcp-server
-      line: 'INTERFACES="ens3"'  
+      line: 'INTERFACES="ens3"'
     become: true
 
   - name: config tftp - set as daemon
@@ -146,6 +149,20 @@
     lineinfile:
       dest: /etc/exports
       line: '/home 10.0.0.0/24(rw,sync)'
+    become: true
+
+  - name: auto.master for computes
+    template:
+      src: fe_etc_auto_master.j2
+      dest: /var/www/html/auto.master
+    ignore_errors: yes
+    become: true
+
+  - name: auto.home for computes
+    template:
+      src: fe_etc_auto_home.j2
+      dest: /var/www/html/auto.home
+    ignore_errors: yes
     become: true
 
   - name: config inetd.conf
@@ -294,8 +311,16 @@
     args:
       creates: "{{ ansible_user_dir }}/.ssh/id_rsa"
 
+  - name: Set trust on SSH key on frontend
+    shell: /bin/cat "{{ ansible_user_dir }}"/.ssh/id_rsa.pub >> "{{ ansible_user_dir }}/.ssh/authorized_keys"
+
+  - name: Set perms on authorized_keys
+    file:
+      dest: "{{ ansible_user_dir }}/.ssh/authorized_keys"
+      mode: "a+x"
+
   - name: Read id_rsa.pub key content
-    shell: /bin/cat "{{ ansible_user_dir}}"/.ssh/id_rsa.pub
+    shell: /bin/cat "{{ ansible_user_dir }}"/.ssh/id_rsa.pub
     register: PUBLIC_KEY
 
   - name: postscript installation

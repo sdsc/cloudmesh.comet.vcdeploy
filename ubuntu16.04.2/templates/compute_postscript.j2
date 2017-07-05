@@ -37,7 +37,9 @@ echo  '
 wget -O /etc/hosts http://10.0.0.254/hosts
 wget -O /root/firstboot.sh http://10.0.0.254/firstboot.sh
 wget -O /etc/rc.local http://10.0.0.254/rc.local
+wget -O /etc/auto.master http://10.0.0.254/auto.master
+wget -O /etc/auto.home http://10.0.0.254/auto.home
 chmod +x /etc/rc.local /root/firstboot.sh
 
 apt-get update
-apt-get -y install autoconf automake dkms g++ htop ibacm ibutils ibverbs-utils infiniband-diags libibcm-dev libibcm.* libibmad-dev libibmad.* libibumad-dev libibumad* libibverbs-dev libibverbs* libmlx4-dev libmlx4* libmlx5* libmthca-dev libopenmpi-dev librdmacm-dev librdmacm* libtool make mstflint nfs-common ntp openmpi-bin opensm perftest python-mpi4py rdmacm-utils srptools ssh tree vlan wget python-dev python-minimal
+apt-get -y install autoconf autofs automake dkms g++ htop ibacm ibutils ibverbs-utils infiniband-diags libibcm-dev libibcm.* libibmad-dev libibmad.* libibumad-dev libibumad* libibverbs-dev libibverbs* libmlx4-dev libmlx4* libmlx5* libmthca-dev libopenmpi-dev librdmacm-dev librdmacm* libtool make mstflint nfs-common ntp openmpi-bin opensm perftest python-mpi4py rdmacm-utils srptools ssh tree vim vlan wget

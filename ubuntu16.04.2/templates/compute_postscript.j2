@@ -27,6 +27,11 @@ rdma_ucm' >> /etc/modules
 # install of more packages could be done
 sed -i "s/10.0.0.254/us.archive.ubuntu.com/g" /etc/apt/sources.list
 
+# change kernel screen mode
+#sed -i 's/\(GRUB_CMDLINE_LINUX_DEFAULT="\)[a-z ]*\("\)/\1nomodeset\2/g' /etc/grub/default
+#sed -i 's/^#\(GRUB_TERMINAL=console\)/\1/g' /etc/grub/default
+#/usr/sbin/update-grub
+
 echo 'btl_openib_warn_no_device_params_found = 0' >>  /etc/openmpi/openmpi-mca-params.conf
 
 echo  '

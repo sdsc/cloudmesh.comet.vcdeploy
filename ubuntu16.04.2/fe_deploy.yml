@@ -323,6 +323,16 @@
     shell: /bin/cat "{{ ansible_user_dir }}"/.ssh/id_rsa.pub
     register: PUBLIC_KEY
 
+  - name: Configure grub for text console on frontend
+    template:
+      src: fe_etc_default_grub.j2
+      dest: /etc/default/grub
+    become: true
+
+  - name: Run update-grub on frontend
+    shell: /usr/sbin/update-grub
+    become: true
+
   - name: postscript installation
     template:
       src: compute_postscript.j2
